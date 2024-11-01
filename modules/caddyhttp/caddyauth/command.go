@@ -106,16 +106,28 @@ func cmdHashPassword(fs caddycmd.Flags) (int, error) {
 
 	var hash []byte
 	var hashString string
-	switch algorithm {
-	case "bcrypt":
-		hash, err = BcryptHash{}.Hash(plaintext)
-		hashString = string(hash)
-	default:
+
+	hashModules := caddy.GetModules("http.authentication.hashes")
+	var hashModuleInfo caddy.ModuleInfo
+	foundOne := false
+	for _, moduleInfo := range hashModules {
+		if moduleInfo.ID.Name() == algorithm {
+			hashModuleInfo = moduleInfo
+			foundOne = true
+			break
+		}
+	}
+	if !foundOne {
 		return caddy.ExitCodeFailedStartup, fmt.Errorf("unrecognized hash algorithm: %s", algorithm)
 	}
+	inst := hashModuleInfo.New()
+	hasher := inst.(Hasher)
+	hash, err = hasher.Hash(plaintext)
 	if err != nil {
 		return caddy.ExitCodeFailedStartup, err
 	}
+
+	hashString = string(hash)
 
 	fmt.Println(hashString)
 

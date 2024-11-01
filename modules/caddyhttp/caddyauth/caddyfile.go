@@ -61,12 +61,23 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 		return nil, h.ArgErr()
 	}
 
-	switch hashName {
-	case "bcrypt":
-		cmp = BcryptHash{}
-	default:
+	hashModules := caddy.GetModules("http.authentication.hashes")
+
+	var hashModuleInfo caddy.ModuleInfo
+	foundOne := false
+	for _, moduleInfo := range hashModules {
+		if moduleInfo.ID.Name() == hashName {
+			hashModuleInfo = moduleInfo
+			foundOne = true
+			break
+		}
+	}
+	if !foundOne {
 		return nil, h.Errf("unrecognized hash algorithm: %s", hashName)
 	}
+
+	inst := hashModuleInfo.New()
+	cmp = inst.(Comparer)
 
 	ba.HashRaw = caddyconfig.JSONModuleObject(cmp, "algorithm", hashName, nil)
 
